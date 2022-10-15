@@ -1,9 +1,19 @@
+require('dotenv').config()
+// const dotenv = require('dotenv')
+// dotenv.config()
+
 const express = require('express')
+const mongoose = require('mongoose')
+const userRoute = require('./routes/user')
+
+// Express App
 const app = express()
 
-app.listen(5000, () => {
-  console.log('backend is running on port 5000')
-})
+// Middleware
+app.use(express.json())
+
+//Routes
+app.use('/api/users', userRoute)
 
 // Connect to DB
 mongoose
