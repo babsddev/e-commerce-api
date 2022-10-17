@@ -1,9 +1,14 @@
-const { verifyToken, verifyTokenAndAuthorization } = require('./verifyToken')
+const User = require('../models/User')
+const {
+  verifyToken,
+  verifyTokenAndAuthorization,
+  verifyTokenAndAdmin,
+} = require('./verifyToken')
 
 const router = require('express').Router()
 
 // UPDATE
-router.put('./:id', verifyTokenAndAuthorization, async (req, res) => {
+router.put('/:id', verifyTokenAndAuthorization, async (req, res) => {
   if (req.body.password) {
     req.body.password = CryptoJS.AES.encrypt(
       req.body.password,
@@ -12,17 +17,81 @@ router.put('./:id', verifyTokenAndAuthorization, async (req, res) => {
   }
 
   try {
-  } catch (error) {}
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: req.body, // take the parameter in body and set it again
+      },
+      { new: true } // this returns the new updated user by setting it to true
+    )
+    res.status(200).json(updatedUser)
+  } catch (error) {
+    res.status(400).json({ error: 'user not updated' })
+  }
 })
 
-// router.get('/usertest', (req, res) => {
-//   res.send('user test is successful')
-// })
+// DELETE
+router.delete('/:id', verifyTokenAndAuthorization, async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.params.id)
+    res.status(200).json('User has been deleted...')
+  } catch (error) {
+    res.status(500).json({ error: 'be a valid user to delete' })
+  }
+})
 
-// // taking a request from the user
-// router.post('/userposttest', (req, res) => {
-//   const username = req.body.username // taking username from client/user, body is what we are passing to our serve
-//   res.send('This is your username : ' + username)
-// })
+// GET Single USER and also geting an admin
+router.get('/find/:id', verifyTokenAndAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+    const { password, ...others } = user._doc
+
+    res.status(200).json(others)
+  } catch (error) {
+    res.status(500).json(error)
+  }
+})
+
+// GET ALL USERS
+router.get('/', verifyTokenAndAdmin, async (req, res) => {
+  const query = req.query.new // display the newest user
+  try {
+    const users = query
+      ? await User.find().sort({ _id: -1 }).limit(5)
+      : await User.find()
+
+    res.status(200).json(users)
+  } catch (error) {
+    res.status(403).json(error)
+  }
+})
+
+// GET USER STATISTICS
+router.get('/stats', verifyTokenAndAdmin, async (req, res) => {
+  const date = new Date()
+  const lastYear = new Date(date.setFullYear(date.getFullYear() - 1))
+
+  try {
+    const data = await User.aggregate([
+      // condition
+      { $match: { createdAt: { $gte: lastYear } } },
+      {
+        $project: {
+          month: { $month: '$createdAt' },
+        },
+      },
+      {
+        $group: {
+          _id: '$month',
+          total: { $sum: 1 },
+        },
+      },
+    ])
+
+    res.status(200).json(data)
+  } catch (error) {
+    res.status(500).json(error)
+  }
+})
 
 module.exports = router
